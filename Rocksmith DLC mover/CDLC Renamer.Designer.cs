@@ -46,7 +46,6 @@ namespace Rocksmith_DLC_mover
             // 
             // statusBox
             // 
-            this.statusBox.Enabled = false;
             this.statusBox.Location = new System.Drawing.Point(13, 13);
             this.statusBox.Name = "statusBox";
             this.statusBox.ReadOnly = true;
