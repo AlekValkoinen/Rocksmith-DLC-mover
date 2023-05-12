@@ -37,6 +37,7 @@ namespace Rocksmith_DLC_mover
             this.btnTransfer = new System.Windows.Forms.Button();
             this.btnCleanup = new System.Windows.Forms.Button();
             this.gbOptions = new System.Windows.Forms.GroupBox();
+            this.cbBackupCDLC = new System.Windows.Forms.CheckBox();
             this.cbAutoSort = new System.Windows.Forms.CheckBox();
             this.cbSaveOrig = new System.Windows.Forms.CheckBox();
             this.btnAuto = new System.Windows.Forms.Button();
@@ -91,6 +92,7 @@ namespace Rocksmith_DLC_mover
             this.btnAbort.TabIndex = 4;
             this.btnAbort.Text = "Abort Transfer";
             this.btnAbort.UseVisualStyleBackColor = true;
+            this.btnAbort.Click += new System.EventHandler(this.btnAbort_Click);
             // 
             // btnTransfer
             // 
@@ -104,7 +106,7 @@ namespace Rocksmith_DLC_mover
             // 
             // btnCleanup
             // 
-            this.btnCleanup.Location = new System.Drawing.Point(595, 164);
+            this.btnCleanup.Location = new System.Drawing.Point(595, 197);
             this.btnCleanup.Name = "btnCleanup";
             this.btnCleanup.Size = new System.Drawing.Size(187, 48);
             this.btnCleanup.TabIndex = 6;
@@ -114,6 +116,7 @@ namespace Rocksmith_DLC_mover
             // 
             // gbOptions
             // 
+            this.gbOptions.Controls.Add(this.cbBackupCDLC);
             this.gbOptions.Controls.Add(this.cbAutoSort);
             this.gbOptions.Controls.Add(this.cbSaveOrig);
             this.gbOptions.Location = new System.Drawing.Point(595, 388);
@@ -122,6 +125,17 @@ namespace Rocksmith_DLC_mover
             this.gbOptions.TabIndex = 7;
             this.gbOptions.TabStop = false;
             this.gbOptions.Text = "Options";
+            // 
+            // cbBackupCDLC
+            // 
+            this.cbBackupCDLC.AutoSize = true;
+            this.cbBackupCDLC.Location = new System.Drawing.Point(7, 120);
+            this.cbBackupCDLC.Name = "cbBackupCDLC";
+            this.cbBackupCDLC.Size = new System.Drawing.Size(133, 24);
+            this.cbBackupCDLC.TabIndex = 2;
+            this.cbBackupCDLC.Text = "Back up CDLC";
+            this.cbBackupCDLC.UseVisualStyleBackColor = true;
+            this.cbBackupCDLC.CheckedChanged += new System.EventHandler(this.cbMakeBackup_CheckedChanged);
             // 
             // cbAutoSort
             // 
@@ -201,6 +215,7 @@ namespace Rocksmith_DLC_mover
         private System.Windows.Forms.CheckBox cbSaveOrig;
         private System.Windows.Forms.Button btnAuto;
         private System.Windows.Forms.Label lblAuto;
+        private System.Windows.Forms.CheckBox cbBackupCDLC;
     }
 }
 

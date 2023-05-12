@@ -1,18 +1,21 @@
 ﻿using Rocksmith_DLC_mover.Settings;
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Drawing;
 using System.IO;
 using System.Linq;
+using System.Linq.Expressions;
 using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Forms;
+using static System.Net.Mime.MediaTypeNames;
 
 namespace Rocksmith_DLC_mover.Data_Helpers
 {
     internal static class FileHandling
     {
-        private static void prepareTransfer(RichTextBox text, CheckBox cbSaveOrig, CheckBox cbAutoSort)
+        private static void prepareTransfer(RichTextBox text, CheckBox cbSaveOrig, CheckBox cbAutoSort, CheckBox cbMakeBackup)
         {
             string ext = "*.psarc";
             try
@@ -95,12 +98,87 @@ namespace Rocksmith_DLC_mover.Data_Helpers
                 {
                     cleanup(text);
                 }
+                if (cbMakeBackup.Checked)
+                {
+                    MakeBackup(text);
+                }
             }
 
             catch (Exception e)
             {
                 DataHelpersClass.print(e.ToString(), text);
             }
+        }
+
+        private static void MakeBackup(RichTextBox text)
+        {
+            //DataHelpersClass.print("Source Path is: " + Settings_Manager.getCdlcFolder(), Color.OrangeRed, text);
+            //DataHelpersClass.print("Destination Path is: " + Settings_Manager.getBackupPath(), Color.OrangeRed, text);
+            CopyDirectories(Settings_Manager.getCdlcFolder(), Settings_Manager.getBackupPath(), true, text);
+        }
+
+        private static void CopyDirectories(string SourceDirectory,  string DestinationDirectory, bool recursive, RichTextBox text)
+        {
+
+            // THis is going to need to be handled on a dedicated thread I think.
+            DirectoryInfo cdlcInfo = new DirectoryInfo(SourceDirectory);
+            DirectoryInfo Destination = new DirectoryInfo(DestinationDirectory);
+
+            //Check Source
+            if (!cdlcInfo.Exists)
+            {
+                MessageBox.Show("Tell the Dev The COPY Directories Function in FileHandling is not working correctly", "the dev fucked up", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+            //lets get the subdirectories in memory
+            DirectoryInfo[] subDirectories = cdlcInfo.GetDirectories();
+
+            //check destination, make it if it doesn't exist
+            try
+            {
+                if (!Destination.Exists)
+                {
+                    DirectoryInfo di = Directory.CreateDirectory(Destination.FullName);
+                    DataHelpersClass.print(Destination.FullName + " created successfully", Color.Green, text);
+                }
+            }
+            catch
+            {
+                MessageBox.Show("The Destination folder does not exist and could not be created. Is this a write protected directory (program files?)", "Could not create Destination", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+            //get any files that may exist in this folder and make the copies if they don't already exist.
+
+            int testingInterator = 0;
+            foreach (FileInfo file in cdlcInfo.GetFiles())
+            {
+                string targetFilePath = Path.Combine(Destination.FullName, file.Name);
+                if (File.Exists(targetFilePath))
+                {
+                    DataHelpersClass.print("Files Exists, Skipping", Color.Green, text);
+                    DataHelpersClass.print("Filename: " + targetFilePath, Color.Red, text);
+
+                    testingInterator++;
+                    if (testingInterator > 20)
+                    {
+                        break;
+                    }
+                }
+                else
+                {
+                    file.CopyTo(targetFilePath);
+                    DataHelpersClass.print(file.Name + "Successfully Copied" , Color.Green, text);
+                }
+
+            }
+            //we need recursion here because we like to sort our crap.
+            if (recursive)
+            {
+                foreach (DirectoryInfo subDir in subDirectories)
+                {
+                    string newDestinationDirectory = Path.Combine(DestinationDirectory, subDir.Name);
+                    CopyDirectories(subDir.FullName, newDestinationDirectory, true, text);
+                }
+            }
+
         }
 
         private static void cleanup(RichTextBox text)
@@ -154,9 +232,9 @@ namespace Rocksmith_DLC_mover.Data_Helpers
 
 
 
-        public static void ReqTransfer(RichTextBox text, CheckBox cbSaveOrig, CheckBox cbAutoSort)
+        public static void ReqTransfer(RichTextBox text, CheckBox cbSaveOrig, CheckBox cbAutoSort, CheckBox cbMakeBackup)
         {
-            prepareTransfer(text, cbSaveOrig, cbAutoSort);
+            prepareTransfer(text, cbSaveOrig, cbAutoSort, cbMakeBackup);
         }
         public static void ReqCleanup(RichTextBox text)
         {

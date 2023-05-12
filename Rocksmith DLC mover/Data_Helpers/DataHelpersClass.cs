@@ -7,6 +7,7 @@ using System.IO;
 using System.Drawing;
 using System.Windows.Forms;
 using System.Globalization;
+using System.Runtime.CompilerServices;
 
 namespace Rocksmith_DLC_mover
 {
@@ -33,6 +34,7 @@ namespace Rocksmith_DLC_mover
 
         public static void print(string message, RichTextBox tb)
         {
+            
             tb.AppendText(message + "\n");
             tb.ScrollToCaret();
         }

@@ -52,6 +52,7 @@
     <Compile Include="CDLC Renamer.Designer.cs">
       <DependentUpon>CDLC Renamer.cs</DependentUpon>
     </Compile>
+    <Compile Include="Data_Helpers\ControlHelper.cs" />
     <Compile Include="Data_Helpers\DataHelpersClass.cs" />
     <Compile Include="Data_Helpers\FileHandling.cs" />
     <Compile Include="Program.cs" />

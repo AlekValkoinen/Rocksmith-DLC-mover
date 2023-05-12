@@ -6,6 +6,7 @@ using System.Drawing;
 using System.Collections.Generic;
 using Rocksmith_DLC_mover.Settings;
 using Rocksmith_DLC_mover.Data_Helpers;
+using System.ComponentModel;
 //using System.Threading;
 
 /*
@@ -48,18 +49,46 @@ namespace Rocksmith_DLC_mover
     public partial class CDLCReNamer : Form
     {
         public static bool Auto = false;
-        
-
+        Button btnClear = new Button();
+        Button btnSetBackup = new Button();
         public static FileSystemWatcher fs = new FileSystemWatcher();
+        BackgroundWorker FileWorker = new BackgroundWorker();
+
+
         public CDLCReNamer()
         {
             InitializeComponent();
 
             btnTransfer.Enabled = false;
-            Settings.Settings_Manager.checkForSettings(statusBox, cbSaveOrig, cbAutoSort, btnTransfer);
+            Settings.Settings_Manager.checkForSettings(statusBox, cbSaveOrig, cbAutoSort, btnTransfer, cbBackupCDLC);
             lblAuto.BackColor = Color.Red;
-            
+            ControlHelper controlHelper = new ControlHelper();
+            btnClear = controlHelper.MakeButton(btnAbort.Right + 10, btnTransfer.Left - 10, btnTransfer.Height, "btnClear", "Clear Log");
+            btnClear.Location = controlHelper.MakePoint(btnAbort.Location, btnAbort.Width + 10, true);
+            btnClear.Click += new EventHandler(this.btnClear_Click);
+            Controls.Add(btnClear);
+
+            btnSetBackup = controlHelper.MakeButton(BtnSetRSFolder.Left, BtnSetRSFolder.Right, BtnSetRSFolder.Height, "btnSetBackup", "Set CDLC Backup Location");
+            btnSetBackup.Location = controlHelper.MakePoint(BtnSetRSFolder.Location, BtnSetRSFolder.Height + 5, false);
+            btnSetBackup.Click += new EventHandler(this.btnSetBackup_Click);
+            Controls.Add(btnSetBackup);
+
+
+            //set up background worker
+
+            FileWorker.WorkerSupportsCancellation = true;
+            FileWorker.WorkerReportsProgress = true;
+            FileWorker.DoWork += new DoWorkEventHandler(FileWorker_DoWork);
+            FileWorker.ProgressChanged += new ProgressChangedEventHandler(FileWorker_Updates);
         }
+
+        private void FileWorker_Updates(object sender, ProgressChangedEventArgs e)
+        {
+            string message = e.UserState.ToString();
+            DataHelpersClass.print(message, Color.Red, statusBox);
+        }
+
+
         private void SetLabel()
         {
             lblAuto.BackColor = Auto ? Color.Green : Color.Red;
@@ -71,6 +100,29 @@ namespace Rocksmith_DLC_mover
             //{
             //    lblAuto.BackColor = Color.Red;
             //}
+        }
+
+        private void btnSetBackup_Click(object sender, EventArgs e)
+        {
+            DialogResult result = MessageBox.Show("This task is Beta, Proceed with Caution, If you intend to make a backup, Check the box below. This function will create a CDLC folder in the Folder you choose at the time of the next transfer.", "Are you sure?", MessageBoxButtons.OKCancel, MessageBoxIcon.Exclamation,MessageBoxDefaultButton.Button2);
+
+            if (result == DialogResult.OK)
+            {
+                FolderBrowserDialog dialog = new FolderBrowserDialog();
+                if (dialog.ShowDialog() == DialogResult.OK) //This shows the dialog, then if the result was 'ok' then it will do the following.
+                {
+                    Settings_Manager.settings[4] = dialog.SelectedPath;
+                    DataHelpersClass.populateDlcFilesList(Settings_Manager.getDlcFolder(), Settings_Manager.getCdlcFolder());
+                    DataHelpersClass.print("Backup folder is now set to " + Settings_Manager.settings[4], statusBox);
+                    Settings_Manager.requestWriteSettings(btnTransfer, statusBox);
+                    //downFolder = dialog.SelectedPath;
+                    //statusBox.AppendText("Download folder has been set to " + downFolder);
+                }
+            }
+        }
+        private void btnClear_Click(object sender, EventArgs e)
+        {
+            statusBox.Clear();
         }
         private void btnSetDownloadFolder_Click(object sender, EventArgs e)
         {
@@ -105,8 +157,29 @@ namespace Rocksmith_DLC_mover
 
         private void btnTransfer_Click(object sender, EventArgs e)
         {
-            FileHandling.ReqTransfer(statusBox, cbSaveOrig, cbAutoSort);
+            FileHandling.ReqTransfer(statusBox, cbSaveOrig, cbAutoSort, cbBackupCDLC);
+            //if (FileWorker.IsBusy != true)
+            //{
+            //    FileWorker.RunWorkerAsync();
+            //}
+            //FileHandling.ReqTransfer(statusBox, cbSaveOrig, cbAutoSort, cbBackupCDLC);
         }
+        private void FileWorker_DoWork(object sender, DoWorkEventArgs e)
+        {
+            BackgroundWorker worker = sender as BackgroundWorker;
+
+            if (worker.CancellationPending == true)
+            {
+                e.Cancel = true;
+                return;
+            }
+            else
+            {
+                FileHandling.ReqTransfer(statusBox, cbSaveOrig, cbAutoSort, cbBackupCDLC);
+            }
+
+        }
+
 
         private void btnCleanup_Click(object sender, EventArgs e)
         {
@@ -122,6 +195,21 @@ namespace Rocksmith_DLC_mover
         private void cbAutoSort_CheckedChanged(object sender, EventArgs e)
         {
             Settings_Manager.settings[3] = cbAutoSort.Checked ? "1" : "0";
+            Settings_Manager.requestWriteSettings(btnTransfer, statusBox);
+        }
+        private void cbMakeBackup_CheckedChanged(object sender, EventArgs e)
+        {
+            //befire we can commit to this, we need to make sure that we have a destination set, if not, we uncheck the box, and do not turn it on.
+            if (cbBackupCDLC.Checked)
+            {
+                if (Settings_Manager.settings[4] == "")
+                {
+                    MessageBox.Show("You MUST set a backup directory before enabling this feature.", "SET BACKUP DIRECTORY", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    cbBackupCDLC.Checked = false;
+                    return;
+                }
+            }
+            Settings_Manager.settings[5] = cbBackupCDLC.Checked ? "1" : "0";
             Settings_Manager.requestWriteSettings(btnTransfer, statusBox);
         }
 
@@ -165,12 +253,22 @@ namespace Rocksmith_DLC_mover
             if (InvokeRequired)
             {
                 BeginInvoke(new Action(() => { DataHelpersClass.print("New Song Detected: " + e.Name, statusBox); }));
-                FileHandling.ReqTransfer(statusBox, cbSaveOrig, cbAutoSort);
+                //FileHandling.ReqTransfer(statusBox, cbSaveOrig, cbAutoSort, cbBackupCDLC);
+                if (!FileWorker.IsBusy)
+                {
+                    FileWorker.RunWorkerAsync();
+                }
             }
 
         }
 
-
+        private void btnAbort_Click(object sender, EventArgs e)
+        {
+            if (FileWorker.WorkerSupportsCancellation)
+            {
+                FileWorker.CancelAsync();
+            }
+        }
     } 
 
 }

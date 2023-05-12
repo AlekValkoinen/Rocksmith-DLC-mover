@@ -25,11 +25,19 @@ namespace Rocksmith_DLC_mover.Settings
         //where the amount of data should only ever at most be a couple thousand strings it SHOULD be fine, much more than that the game will crash anyway.
 
         public static List<string> dlcNames = new List<string>();
-        public static string[] settings = new string[] { "", "", "0", "0" };
+
+        // Settings Indices contain the Following
+        // 0: Download folder
+        // 1: RS Directory, target folder
+        // 2: Save Originals
+        // 3: AutoSort
+        // 4: Backup Directory
+        // 5: Make Backup Checkbox Status
+        public static string[] settings = new string[] { "", "", "0", "0", "", "0" };
         public static readonly string dlcAppend = "\\dlc\\cdlc";
 
         //We're going to check for a setting file in AppData, for out program, If they don't exist, we're going to create them.
-        public static void checkForSettings(RichTextBox text, CheckBox cbSaveOrig, CheckBox cbAuto, Button btnTransfer)
+        public static void checkForSettings(RichTextBox text, CheckBox cbSaveOrig, CheckBox cbAuto, Button btnTransfer, CheckBox cbMakeBackup)
         {
             //before we get started we want the local AppData path, this uses the System Namespace.
             //This will allow us to set the destination in a nice folder there. So let's do that first.
@@ -79,7 +87,7 @@ namespace Rocksmith_DLC_mover.Settings
             if (File.Exists(configPath))
             {
                 DataHelpersClass.print("Config Files Exist. Attempting to restore previous settings", text);
-                readInSettings(configPath, text, cbSaveOrig, cbAuto, btnTransfer);
+                readInSettings(configPath, text, cbSaveOrig, cbAuto, btnTransfer, cbMakeBackup);
             }
             else
             {
@@ -93,13 +101,13 @@ namespace Rocksmith_DLC_mover.Settings
 
         }
 
-        private static void readInSettings(string filePath,RichTextBox text, CheckBox cbSaveOrig, CheckBox cbAuto, Button btnTransfer)
+        private static void readInSettings(string filePath,RichTextBox text, CheckBox cbSaveOrig, CheckBox cbAuto, Button btnTransfer, CheckBox cbMakeBackup)
         {
             //read in the file by each line, line 0 will be the Download path, line 1 will be the RS path, it will add them to the settings list.
             int c = 0;
             foreach (string line in File.ReadLines(filePath))
             {
-                if (c < 4)
+                if (c < 6)
                 {
                     settings[c] = line;
                 }
@@ -127,6 +135,7 @@ namespace Rocksmith_DLC_mover.Settings
 #pragma warning disable IDE0075 // Can be simplified, I find this more readable.
             cbSaveOrig.Checked = settings[2] == "1" ? true : false;
             cbAuto.Checked = settings[3] == "1" ? true : false;
+            cbMakeBackup.Checked = settings[5] == "1" ? true : false;
 #pragma warning restore IDE0075 // Simplify conditional expression
 
 
@@ -146,6 +155,8 @@ namespace Rocksmith_DLC_mover.Settings
                     tw.WriteLine(settings[1]);
                     tw.WriteLine(settings[2]);
                     tw.WriteLine(settings[3]);
+                    tw.WriteLine(settings[4]);
+                    tw.WriteLine(settings[5]);
                     //print(settings[2]);
                     //print(settings[3]);
                     DataHelpersClass.print("DEBUG: Configuration updated", text);
@@ -227,6 +238,10 @@ namespace Rocksmith_DLC_mover.Settings
         public static string getConfigPath()
         {
             return configPath;
+        }
+        public static string getBackupPath()
+        {
+            return settings[4] + "\\cdlc";
         }
         public static void requestWriteSettings(Button btnTransfer ,RichTextBox text)
         {
