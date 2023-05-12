@@ -1,4 +1,5 @@
-﻿using Rocksmith_DLC_mover.Settings;
+﻿using Rocksmith_DLC_mover.Extensions;
+using Rocksmith_DLC_mover.Settings;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
@@ -15,7 +16,43 @@ namespace Rocksmith_DLC_mover.Data_Helpers
 {
     internal static class FileHandling
     {
-        private static void prepareTransfer(RichTextBox text, CheckBox cbSaveOrig, CheckBox cbAutoSort, CheckBox cbMakeBackup)
+        static BackgroundWorker fileWorker = new BackgroundWorker();
+
+        //we need to send the events for update progress back to the calling class
+        public delegate void UpdateProgressEventHandler(object sender, TextEventExtension e);
+        public static event UpdateProgressEventHandler raiseUpdateEvent;
+        public delegate void StringTransferEvent(object sender, TextEventExtension e);
+        public static event StringTransferEvent RaiseStringTransferEvent;
+        private static bool WorkerSetup = false;
+
+        public static void onRaiseStringTransferEvent(object sender, TextEventExtension e)
+        {
+            StringTransferEvent raiseEvent = RaiseStringTransferEvent;
+            if (raiseEvent != null)
+            {
+                raiseEvent(sender, e);
+            }
+        }
+
+        public static void DoStringTransfer(object sender, string text, Color color)
+        {
+            TextEventExtension TextEvent = new TextEventExtension(text, color);
+            onRaiseStringTransferEvent(sender, TextEvent);
+        }
+        public static void DoStringTransfer(object sender, TextEventExtension e)
+        {
+            onRaiseStringTransferEvent(sender, e);
+        }
+        public static void onRaiseUpdateEvent(object sender, TextEventExtension e)
+        {
+            UpdateProgressEventHandler RaiseEvent = raiseUpdateEvent;
+            if (RaiseEvent != null)
+            {
+                RaiseEvent(fileWorker, e);
+            }
+        }
+
+        private static void prepareTransfer(RichTextBox text, CheckBox cbSaveOrig, CheckBox cbAutoSort, CheckBox cbMakeBackup, CDLCReNamer MainProgramRef)
         {
             string ext = "*.psarc";
             try
@@ -100,7 +137,14 @@ namespace Rocksmith_DLC_mover.Data_Helpers
                 }
                 if (cbMakeBackup.Checked)
                 {
-                    MakeBackup(text);
+                    MainProgramRef.RaiseAbortEvent += HandleAbortAsync;
+                    setupFileWorker();
+                    if (!fileWorker.IsBusy)
+                    {
+                        fileWorker.RunWorkerAsync();
+                    }
+
+                    
                 }
             }
 
@@ -110,76 +154,213 @@ namespace Rocksmith_DLC_mover.Data_Helpers
             }
         }
 
-        private static void MakeBackup(RichTextBox text)
+        private static void MakeBackup(object sender, DoWorkEventArgs e)
         {
             //DataHelpersClass.print("Source Path is: " + Settings_Manager.getCdlcFolder(), Color.OrangeRed, text);
             //DataHelpersClass.print("Destination Path is: " + Settings_Manager.getBackupPath(), Color.OrangeRed, text);
-            CopyDirectories(Settings_Manager.getCdlcFolder(), Settings_Manager.getBackupPath(), true, text);
+            CopyDirectories(Settings_Manager.getCdlcFolder(), Settings_Manager.getBackupPath(), true, sender, e);
         }
 
-        private static void CopyDirectories(string SourceDirectory,  string DestinationDirectory, bool recursive, RichTextBox text)
+        private static void setupFileWorker()
+        {
+            if (!WorkerSetup)
+            {
+                fileWorker.WorkerSupportsCancellation = true;
+                fileWorker.WorkerReportsProgress = true;
+                fileWorker.DoWork += new DoWorkEventHandler(fileWorker_DoWork);
+                fileWorker.ProgressChanged += new ProgressChangedEventHandler(fileWorker_ProgressChanged);
+                fileWorker.RunWorkerCompleted += new RunWorkerCompletedEventHandler(fileWorker_Completed); 
+                WorkerSetup = true;
+            }
+        }
+        public static void fileWorker_Completed(object sender, RunWorkerCompletedEventArgs e)
+        {
+            if (e.Error != null)
+            {
+                MessageBox.Show("The operation copying files has resulted in an error.", "Copy Error in background thread", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                DoStringTransfer(sender, "The Copy Delegate ended in Error", Color.Red);
+            }
+            else if (e.Cancelled)
+            {
+                
+                TextEventExtension TextEvent = new TextEventExtension("Operation Cancelled by User", Color.Red);
+                DoStringTransfer(sender, TextEvent);
+                //fileWorker.ProgressChanged(0, TextEvent);
+                
+                //(0, TextEvent);
+            }
+            else
+            {
+                TextEventExtension TextEvent = new TextEventExtension("Operation Successful", Color.Green);
+                DoStringTransfer(sender, TextEvent);
+                //fileWorker.ReportProgress(0, TextEvent);
+            }
+
+        }
+
+        private static void fileWorker_DoWork(object sender, DoWorkEventArgs e)
+        {
+            //MainProgram.RaiseAbortEvent += HandleAbortAsync;
+            MakeBackup(sender, e);
+        }
+        
+        private static void HandleAbortAsync(object sender, AbortAsyncEventArgs e)
         {
 
-            // THis is going to need to be handled on a dedicated thread I think.
-            DirectoryInfo cdlcInfo = new DirectoryInfo(SourceDirectory);
-            DirectoryInfo Destination = new DirectoryInfo(DestinationDirectory);
+                if(fileWorker.WorkerSupportsCancellation)
+                {
+                    fileWorker.CancelAsync();
+                }
 
-            //Check Source
-            if (!cdlcInfo.Exists)
+        }
+
+        private static void CopyDirectories(string sourceDirectory, string destinationDirectory, bool recursive, object sender, DoWorkEventArgs e)
+        {
+            DirectoryInfo SourceDir = new DirectoryInfo(sourceDirectory);
+            DirectoryInfo DestDir = new DirectoryInfo(destinationDirectory);
+
+            //check the source file
+            if (!SourceDir.Exists)
             {
                 MessageBox.Show("Tell the Dev The COPY Directories Function in FileHandling is not working correctly", "the dev fucked up", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
-            //lets get the subdirectories in memory
-            DirectoryInfo[] subDirectories = cdlcInfo.GetDirectories();
 
-            //check destination, make it if it doesn't exist
+            DirectoryInfo[] subDirectories = SourceDir.GetDirectories();
+
+            //check destination and make sure it exists
+
             try
             {
-                if (!Destination.Exists)
+                if(!DestDir.Exists)
                 {
-                    DirectoryInfo di = Directory.CreateDirectory(Destination.FullName);
-                    DataHelpersClass.print(Destination.FullName + " created successfully", Color.Green, text);
+                    DirectoryInfo di = Directory.CreateDirectory(DestDir.FullName);
+                    TextEventExtension TextEvent = new TextEventExtension(DestDir.FullName + " created successfully", Color.Green);
+                    //string message = DestDir.FullName + " created successfully";
+                    fileWorker.ReportProgress(0, TextEvent);
                 }
             }
             catch
             {
                 MessageBox.Show("The Destination folder does not exist and could not be created. Is this a write protected directory (program files?)", "Could not create Destination", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
-            //get any files that may exist in this folder and make the copies if they don't already exist.
 
-            int testingInterator = 0;
-            foreach (FileInfo file in cdlcInfo.GetFiles())
+            foreach (FileInfo file in SourceDir.GetFiles())
             {
-                string targetFilePath = Path.Combine(Destination.FullName, file.Name);
+                if (fileWorker.CancellationPending)
+                {
+                    e.Cancel = true;
+                    break;
+                }
+                string targetFilePath = Path.Combine(DestDir.FullName, file.Name);
                 if (File.Exists(targetFilePath))
                 {
-                    DataHelpersClass.print("Files Exists, Skipping", Color.Green, text);
-                    DataHelpersClass.print("Filename: " + targetFilePath, Color.Red, text);
+                    TextEventExtension TextEvent = new TextEventExtension("File: " + targetFilePath + "\nExists, Skipping", Color.Green);
+                    fileWorker.ReportProgress(0, TextEvent);
+                    System.Threading.Thread.Sleep(30);
+                    //DataHelpersClass.print("Files Exists, Skipping", Color.Green, text);
+                    //DataHelpersClass.print("Filename: " + targetFilePath, Color.Red, text);
 
-                    testingInterator++;
-                    if (testingInterator > 20)
-                    {
-                        break;
-                    }
                 }
                 else
                 {
                     file.CopyTo(targetFilePath);
-                    DataHelpersClass.print(file.Name + "Successfully Copied" , Color.Green, text);
+                    TextEventExtension TextEvent = new TextEventExtension(file.Name + " successfully copied", Color.Green);
+                    fileWorker.ReportProgress(0, TextEvent);
+                    
+                //    DataHelpersClass.print(file.Name + "Successfully Copied", Color.Green, text);
                 }
 
             }
-            //we need recursion here because we like to sort our crap.
+
+            //Now for the real test, recursion
             if (recursive)
             {
                 foreach (DirectoryInfo subDir in subDirectories)
                 {
-                    string newDestinationDirectory = Path.Combine(DestinationDirectory, subDir.Name);
-                    CopyDirectories(subDir.FullName, newDestinationDirectory, true, text);
+                    if (fileWorker.CancellationPending)
+                    {
+                        e.Cancel = true;
+                        break;
+                    }
+                    string newDestinationDir = Path.Combine(destinationDirectory, subDir.Name);
+                    CopyDirectories(subDir.FullName, newDestinationDir, true, sender, e);
                 }
             }
+            
+            //fileWorker.ReportProgress(0);
 
         }
+
+        private static void fileWorker_ProgressChanged(object sender, ProgressChangedEventArgs e)
+        {
+            TextEventExtension sendText = e.UserState as TextEventExtension;
+            onRaiseUpdateEvent(sender, sendText);
+        }
+        //private static void CopyDirectories(string SourceDirectory,  string DestinationDirectory, bool recursive, RichTextBox text)
+        //{
+
+        //    // THis is going to need to be handled on a dedicated thread I think.
+        //    DirectoryInfo cdlcInfo = new DirectoryInfo(SourceDirectory);
+        //    DirectoryInfo Destination = new DirectoryInfo(DestinationDirectory);
+
+
+
+        //    //Check Source
+        //    if (!cdlcInfo.Exists)
+        //    {
+        //        MessageBox.Show("Tell the Dev The COPY Directories Function in FileHandling is not working correctly", "the dev fucked up", MessageBoxButtons.OK, MessageBoxIcon.Error);
+        //    }
+        //    //lets get the subdirectories in memory
+        //    DirectoryInfo[] subDirectories = cdlcInfo.GetDirectories();
+
+        //    //check destination, make it if it doesn't exist
+        //    try
+        //    {
+        //        if (!Destination.Exists)
+        //        {
+        //            DirectoryInfo di = Directory.CreateDirectory(Destination.FullName);
+        //            DataHelpersClass.print(Destination.FullName + " created successfully", Color.Green, text);
+        //        }
+        //    }
+        //    catch
+        //    {
+        //        MessageBox.Show("The Destination folder does not exist and could not be created. Is this a write protected directory (program files?)", "Could not create Destination", MessageBoxButtons.OK, MessageBoxIcon.Error);
+        //    }
+        //    //get any files that may exist in this folder and make the copies if they don't already exist.
+
+        //    int testingInterator = 0;
+        //    foreach (FileInfo file in cdlcInfo.GetFiles())
+        //    {
+        //        string targetFilePath = Path.Combine(Destination.FullName, file.Name);
+        //        if (File.Exists(targetFilePath))
+        //        {
+        //            DataHelpersClass.print("Files Exists, Skipping", Color.Green, text);
+        //            DataHelpersClass.print("Filename: " + targetFilePath, Color.Red, text);
+
+        //            testingInterator++;
+        //            if (testingInterator > 20)
+        //            {
+        //                break;
+        //            }
+        //        }
+        //        else
+        //        {
+        //            file.CopyTo(targetFilePath);
+        //            DataHelpersClass.print(file.Name + "Successfully Copied" , Color.Green, text);
+        //        }
+
+        //    }
+        //    //we need recursion here because we like to sort our crap.
+        //    if (recursive)
+        //    {
+        //        foreach (DirectoryInfo subDir in subDirectories)
+        //        {
+        //            string newDestinationDirectory = Path.Combine(DestinationDirectory, subDir.Name);
+        //            CopyDirectories(subDir.FullName, newDestinationDirectory, true, text);
+        //        }
+        //    }
+
+        //}
 
         private static void cleanup(RichTextBox text)
         {
@@ -232,9 +413,9 @@ namespace Rocksmith_DLC_mover.Data_Helpers
 
 
 
-        public static void ReqTransfer(RichTextBox text, CheckBox cbSaveOrig, CheckBox cbAutoSort, CheckBox cbMakeBackup)
+        public static void ReqTransfer(RichTextBox text, CheckBox cbSaveOrig, CheckBox cbAutoSort, CheckBox cbMakeBackup, CDLCReNamer MainProgramRef)
         {
-            prepareTransfer(text, cbSaveOrig, cbAutoSort, cbMakeBackup);
+            prepareTransfer(text, cbSaveOrig, cbAutoSort, cbMakeBackup, MainProgramRef);
         }
         public static void ReqCleanup(RichTextBox text)
         {

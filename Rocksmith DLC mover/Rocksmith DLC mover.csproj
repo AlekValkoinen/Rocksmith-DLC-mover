@@ -55,6 +55,8 @@
     <Compile Include="Data_Helpers\ControlHelper.cs" />
     <Compile Include="Data_Helpers\DataHelpersClass.cs" />
     <Compile Include="Data_Helpers\FileHandling.cs" />
+    <Compile Include="Extensions\AbortAsyncEventArgs.cs" />
+    <Compile Include="Extensions\TextEventExtension.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Extensions\RTB_Extension.cs" />

@@ -7,6 +7,8 @@ using System.Collections.Generic;
 using Rocksmith_DLC_mover.Settings;
 using Rocksmith_DLC_mover.Data_Helpers;
 using System.ComponentModel;
+using Rocksmith_DLC_mover.Extensions;
+using System.Security.Cryptography.X509Certificates;
 //using System.Threading;
 
 /*
@@ -53,7 +55,8 @@ namespace Rocksmith_DLC_mover
         Button btnSetBackup = new Button();
         public static FileSystemWatcher fs = new FileSystemWatcher();
         BackgroundWorker FileWorker = new BackgroundWorker();
-
+        public delegate void AbortEventManager(object sender, AbortAsyncEventArgs e);
+        
 
         public CDLCReNamer()
         {
@@ -80,6 +83,12 @@ namespace Rocksmith_DLC_mover
             FileWorker.WorkerReportsProgress = true;
             FileWorker.DoWork += new DoWorkEventHandler(FileWorker_DoWork);
             FileWorker.ProgressChanged += new ProgressChangedEventHandler(FileWorker_Updates);
+
+            //Set up event listener
+
+            FileHandling.raiseUpdateEvent += HandleUpdateText;
+            FileHandling.RaiseStringTransferEvent += HandleUpdateText;
+
         }
 
         private void FileWorker_Updates(object sender, ProgressChangedEventArgs e)
@@ -155,9 +164,20 @@ namespace Rocksmith_DLC_mover
             this.Close();
         }
 
+        private void cancelAsync()
+        {
+
+        }
         private void btnTransfer_Click(object sender, EventArgs e)
         {
-            FileHandling.ReqTransfer(statusBox, cbSaveOrig, cbAutoSort, cbBackupCDLC);
+            
+            
+            btnTransfer.Enabled = false;
+            FileHandling.ReqTransfer(statusBox, cbSaveOrig, cbAutoSort, cbBackupCDLC, this);
+            
+            
+            
+            
             //if (FileWorker.IsBusy != true)
             //{
             //    FileWorker.RunWorkerAsync();
@@ -175,7 +195,7 @@ namespace Rocksmith_DLC_mover
             }
             else
             {
-                FileHandling.ReqTransfer(statusBox, cbSaveOrig, cbAutoSort, cbBackupCDLC);
+                FileHandling.ReqTransfer(statusBox, cbSaveOrig, cbAutoSort, cbBackupCDLC, this);
             }
 
         }
@@ -262,12 +282,36 @@ namespace Rocksmith_DLC_mover
 
         }
 
+        //I don't like inline declarations but since the event is only fired from here I don't want to go looking for it
+        public event AbortEventManager RaiseAbortEvent;
+
+        protected virtual void onRaiseAbortEvent(AbortAsyncEventArgs e)
+        {
+            AbortEventManager RaiseEvent = RaiseAbortEvent;
+
+            if (RaiseEvent != null)
+            {
+
+                RaiseEvent(this, e);
+            }
+        }
+
+        private void HandleUpdateText(object sender, TextEventExtension e)
+        {
+            if (e.Message == "Operation Successful" || e.Message == "Operation Cancelled by User")
+            {
+                btnTransfer.Enabled = true;
+            }
+            if (e.Message == "Operation Cancelled by User")
+            {
+                btnAbort.Enabled = true;
+            }
+            DataHelpersClass.print(e.Message, e.MessageColor, statusBox);
+        }
         private void btnAbort_Click(object sender, EventArgs e)
         {
-            if (FileWorker.WorkerSupportsCancellation)
-            {
-                FileWorker.CancelAsync();
-            }
+            btnAbort.Enabled = false;
+            onRaiseAbortEvent(new AbortAsyncEventArgs("Operation aborted by user"));
         }
     } 
 
