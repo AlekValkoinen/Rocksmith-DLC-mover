@@ -37,7 +37,7 @@ using System.Security.Cryptography.X509Certificates;
  * That said, please do share it, but credit where it's due, in my code when I use someone elses code, I mention who and where
  * please do the same.
  * 
- * DISCLAIMER I am not responsible for anything. If thise program turns your computer into the core of a dying star, not my problem, it's your problem.
+ * DISCLAIMER I am not responsible for anything. If this program turns your computer into the core of a dying star, not my problem, it's your problem.
  * 
  * 
  * 
@@ -53,8 +53,8 @@ namespace Rocksmith_DLC_mover
         public static bool Auto = false;
         Button btnClear = new Button();
         Button btnSetBackup = new Button();
+        Button btnMakeBackup = new Button();
         public static FileSystemWatcher fs = new FileSystemWatcher();
-        BackgroundWorker FileWorker = new BackgroundWorker();
         public delegate void AbortEventManager(object sender, AbortAsyncEventArgs e);
         
 
@@ -76,27 +76,19 @@ namespace Rocksmith_DLC_mover
             btnSetBackup.Click += new EventHandler(this.btnSetBackup_Click);
             Controls.Add(btnSetBackup);
 
-
-            //set up background worker
-
-            FileWorker.WorkerSupportsCancellation = true;
-            FileWorker.WorkerReportsProgress = true;
-            FileWorker.DoWork += new DoWorkEventHandler(FileWorker_DoWork);
-            FileWorker.ProgressChanged += new ProgressChangedEventHandler(FileWorker_Updates);
-
+            btnMakeBackup = controlHelper.MakeButton(btnSetBackup.Left, btnSetBackup.Right, btnSetBackup.Height, "btnMakeBackup", "Make Backup");
+            btnMakeBackup.Location = controlHelper.MakePoint(btnSetBackup.Location, btnSetBackup.Height + 5, false);
+            btnMakeBackup.Click += new EventHandler(this.btnMakeBackup_Click);
+            Controls.Add(btnMakeBackup);
+            //change the location of the last button.
+            btnCleanup.Location = controlHelper.MakePoint(btnMakeBackup.Location, btnMakeBackup.Height + 5, false);
+            
             //Set up event listener
 
             FileHandling.raiseUpdateEvent += HandleUpdateText;
             FileHandling.RaiseStringTransferEvent += HandleUpdateText;
 
         }
-
-        private void FileWorker_Updates(object sender, ProgressChangedEventArgs e)
-        {
-            string message = e.UserState.ToString();
-            DataHelpersClass.print(message, Color.Red, statusBox);
-        }
-
 
         private void SetLabel()
         {
@@ -132,6 +124,8 @@ namespace Rocksmith_DLC_mover
         private void btnClear_Click(object sender, EventArgs e)
         {
             statusBox.Clear();
+            string message = "Log Cleared at " + DateTime.Now.ToString();
+            DataHelpersClass.print(message, Color.DarkCyan, statusBox);
         }
         private void btnSetDownloadFolder_Click(object sender, EventArgs e)
         {
@@ -164,9 +158,9 @@ namespace Rocksmith_DLC_mover
             this.Close();
         }
 
-        private void cancelAsync()
+        private void btnMakeBackup_Click(object sender, EventArgs e)
         {
-
+            FileHandling.ReqBackup(this);
         }
         private void btnTransfer_Click(object sender, EventArgs e)
         {
@@ -175,29 +169,6 @@ namespace Rocksmith_DLC_mover
             btnTransfer.Enabled = false;
             FileHandling.ReqTransfer(statusBox, cbSaveOrig, cbAutoSort, cbBackupCDLC, this);
             
-            
-            
-            
-            //if (FileWorker.IsBusy != true)
-            //{
-            //    FileWorker.RunWorkerAsync();
-            //}
-            //FileHandling.ReqTransfer(statusBox, cbSaveOrig, cbAutoSort, cbBackupCDLC);
-        }
-        private void FileWorker_DoWork(object sender, DoWorkEventArgs e)
-        {
-            BackgroundWorker worker = sender as BackgroundWorker;
-
-            if (worker.CancellationPending == true)
-            {
-                e.Cancel = true;
-                return;
-            }
-            else
-            {
-                FileHandling.ReqTransfer(statusBox, cbSaveOrig, cbAutoSort, cbBackupCDLC, this);
-            }
-
         }
 
 
@@ -225,6 +196,12 @@ namespace Rocksmith_DLC_mover
                 if (Settings_Manager.settings[4] == "")
                 {
                     MessageBox.Show("You MUST set a backup directory before enabling this feature.", "SET BACKUP DIRECTORY", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    cbBackupCDLC.Checked = false;
+                    return;
+                }
+                DialogResult result = MessageBox.Show("The Auto Backup Feature will cause a backup to be created every time there is a transfer, this is resource expensive, and not recommended. Are you sure?", "Are you REALLY sure?", MessageBoxButtons.OKCancel, MessageBoxIcon.Warning, MessageBoxDefaultButton.Button2);
+                if (result == DialogResult.Cancel)
+                {
                     cbBackupCDLC.Checked = false;
                     return;
                 }
@@ -273,11 +250,7 @@ namespace Rocksmith_DLC_mover
             if (InvokeRequired)
             {
                 BeginInvoke(new Action(() => { DataHelpersClass.print("New Song Detected: " + e.Name, statusBox); }));
-                //FileHandling.ReqTransfer(statusBox, cbSaveOrig, cbAutoSort, cbBackupCDLC);
-                if (!FileWorker.IsBusy)
-                {
-                    FileWorker.RunWorkerAsync();
-                }
+                FileHandling.ReqTransfer(statusBox, cbSaveOrig, cbAutoSort, cbBackupCDLC, this);
             }
 
         }

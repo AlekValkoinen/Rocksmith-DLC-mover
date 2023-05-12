@@ -421,6 +421,15 @@ namespace Rocksmith_DLC_mover.Data_Helpers
         {
             cleanup(text);
         }
+        public static void ReqBackup(CDLCReNamer MainProgramRef)
+        {
+            MainProgramRef.RaiseAbortEvent += HandleAbortAsync;
+            setupFileWorker();
+            if (!fileWorker.IsBusy)
+            {
+                fileWorker.RunWorkerAsync();
+            }
+        }
 
 
 

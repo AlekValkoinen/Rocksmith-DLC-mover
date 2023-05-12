@@ -106,7 +106,7 @@ namespace Rocksmith_DLC_mover
             // 
             // btnCleanup
             // 
-            this.btnCleanup.Location = new System.Drawing.Point(595, 197);
+            this.btnCleanup.Location = new System.Drawing.Point(595, 258);
             this.btnCleanup.Name = "btnCleanup";
             this.btnCleanup.Size = new System.Drawing.Size(187, 48);
             this.btnCleanup.TabIndex = 6;
@@ -131,9 +131,9 @@ namespace Rocksmith_DLC_mover
             this.cbBackupCDLC.AutoSize = true;
             this.cbBackupCDLC.Location = new System.Drawing.Point(7, 120);
             this.cbBackupCDLC.Name = "cbBackupCDLC";
-            this.cbBackupCDLC.Size = new System.Drawing.Size(133, 24);
+            this.cbBackupCDLC.Size = new System.Drawing.Size(171, 24);
             this.cbBackupCDLC.TabIndex = 2;
-            this.cbBackupCDLC.Text = "Back up CDLC";
+            this.cbBackupCDLC.Text = "Auto Back up CDLC";
             this.cbBackupCDLC.UseVisualStyleBackColor = true;
             this.cbBackupCDLC.CheckedChanged += new System.EventHandler(this.cbMakeBackup_CheckedChanged);
             // 
